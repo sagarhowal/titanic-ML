@@ -596,23 +596,105 @@ prp(rpart.1.cv.1$finalModel, type = 0, extra = 1, under = TRUE)
 
 #Both rf and rpart confirm that titles is quite important. 
 #Further investigation
+table(data.combined$Titles)
+
+#Parse out Last name and Titles
+data.combined[1:25, "Name"]
+
+name.splits <- str_split(data.combined$Name, ",")
+name.splits[1]
+last.names <- sapply(name.slpits, "[", 1)
+last.names[1:10]
+
+#Adding Last names column to the data.combined just incase we need it in the future
+data.combined$Last.names <- last.names
+
+#Now investigating titles, especially the others. titles. 
+#splitting out titles from names
+name.splits <- str_split(sapply(name.splits, "[", 2), " ")
+titles <- sapply(name.splits,"[", 2)
+unique(titles)
+
+#Checking the title "The"
+data.combined[which(titles == "the"),]
+
+#Re-mapping titles 
+titles[titles %in% c("Dona.", "the")] <- "Lady."
+titles[titles %in% c("Ms.", "Mlle.")] <- "Miss."
+titles[titles == "Mme."] <- "Mrs."
+titles[titles %in% c("Jonkheer.", "Don.")] <- "Sir."
+titles[titles %in% c("Col.", "Capt.", "Major.")] <- "Officer"
+table(titles)
+
+#Cram new titles into data.combined.
+data.combined$New.titles <- as.factor(titles)
 
 
+#Visualize new titles
+ggplot(data.combined[1:nrow(train),], aes(x = New.titles, fill = Survived)) + 
+  stat_count(width = 0.8) + 
+  facet_wrap(~Pclass) + 
+  ggtitle("Survival Viz for new Titles wrt Class")
 
 
+#collapse titles based on Visual analysis
+indexes <- which(data.combined$New.titles == "Lady.")
+data.combined$New.titles[indexes] <- "Mrs."
+
+indexes <- which(data.combined$New.titles == "Dr." |
+                  data.combined$New.titles == "Rev." |
+                  data.combined$New.titles == "Sir." | 
+                  data.combined$New.titles == "Officer")
+data.combined$New.titles[indexes] <- "Mr."
+
+#Visualize new titles
+ggplot(data.combined[1:nrow(train),], aes(x = New.titles, fill = Survived)) + 
+  stat_count(width = 0.8) + 
+  facet_wrap(~Pclass) + 
+  ggtitle("Survival Viz for new Titles wrt Class")
+
+#Grab features and build a tree
+features <- c("Pclass", "New.titles", "FamilySize")
+rpart.train.2 <- data.combined[1:891, features]
+
+#Run Cross validation and test result
+rpart.2.cv.1 <- rpart.cv(96422, rpart.train.2, rf.label, ctrl.3)
+rpart.2.cv.1
+
+#Plot
+prp(rpart.2.cv.1$finalModel, type = 0, extra = 1, under = TRUE)
+
+#diving into 1st class Mr. 
+indexes.first.mr <- which(data.combined$New.titles == "Mr." & data.combined$Pclass == "1")
+first.mr.df <- data.combined[indexes.first.mr, ]
+summary(first.mr.df)
+
+#Summary shows there is one female in Mr. Huh? 
+first.mr.df[first.mr.df$Sex == "female",]
+
+#Shifting Dr Alice Leader to Mrs. 
+indexes <- which(data.combined$New.titles == "Mr." & data.combined$Sex == "female")
+data.combined$New.titles[indexes] <- "Mrs."
+
+#Checking for any other gender slip-ups
+length(which(data.combined$Sex == "female" & 
+               (data.combined$New.titles == "Master." | data.combined$New.titles == "Mr.")))
 
 
+#Refreshing the Mr. 
+indexes.first.mr <- which(data.combined$New.titles == "Mr." & data.combined$Pclass == "1")
+first.mr.df <- data.combined[indexes.first.mr, ]
+summary(first.mr.df)
 
+#checking
+summary(first.mr.df[first.mr.df$Survived == "1",])
+View(first.mr.df[first.mr.df$Survived == "1",])
 
-
-
-
-
-
-
-
-
-
+# Take a look at some of the high fares
+indexes <- which(data.combined$Ticket == "PC 17755" |
+                   data.combined$Ticket == "PC 17611" |
+                   data.combined$Ticket == "113760")
+View(data.combined[indexes,])
 
 
 
